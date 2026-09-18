@@ -18,9 +18,9 @@ Adafruit_Sensor *accelerometer, *gyroscope, *magnetometer;
 //#include "NXP_FXOS_FXAS.h"  // NXP 9-DoF breakout
 
 // pick your filter! slower == better quality output
-//Adafruit_NXPSensorFusion filter; // slowest
+Adafruit_NXPSensorFusion filter; // slowest
 //Adafruit_Madgwick filter;  // faster than NXP
-Adafruit_Mahony filter;  // fastest/smalleset
+//Adafruit_Mahony filter;  // fastest/smalleset
 
 #if defined(ADAFRUIT_SENSOR_CALIBRATION_USE_EEPROM)
   Adafruit_Sensor_Calibration_EEPROM cal;
