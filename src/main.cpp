@@ -12,69 +12,73 @@
  any redistribution
 *********************************************************************/
 #include <bluefruit.h>
+#include <Adafruit_LittleFS.h>
+#include <InternalFileSystem.h>
 
-//Declarations not provided in .ino
-void startAdv(void);
+// BLE Service
+BLEDfu  bledfu;  // OTA DFU service
+BLEDis  bledis;  // device information
+BLEUart bleuart; // uart over ble
+BLEBas  blebas;  // battery
 
-// Beacon uses the Manufacturer Specific Data field in the advertising packet,
-// which means you must provide a valid Manufacturer ID. Update
-// the field below to an appropriate value. For a list of valid IDs see:
-// https://www.bluetooth.com/specifications/assigned-numbers/company-identifiers
-// - 0x004C is Apple
-// - 0x0822 is Adafruit
-// - 0x0059 is Nordic
-// For testing with this sketch, you can use nRF Beacon app
-// - on Android you may need change the MANUFACTURER_ID to Nordic
-// - on iOS you may need to change the MANUFACTURER_ID to Apple.
-//   You will also need to "Add Other Beacon, then enter Major, Minor that you set in the sketch
-#define MANUFACTURER_ID   0x004C
-
-// "nRF Connect" app can be used to detect beacon
-uint8_t beaconUuid[16] = {
-  0x01, 0x12, 0x23, 0x34, 0x45, 0x56, 0x67, 0x78,
-  0x89, 0x9a, 0xab, 0xbc, 0xcd, 0xde, 0xef, 0xf0
-};
-
-// A valid Beacon packet consists of the following information:
-// UUID, Major, Minor, RSSI @ 1M
-BLEBeacon beacon(beaconUuid, 1, 2, -54);
-
-void setup() {
+void setup()
+{
   Serial.begin(115200);
 
-  // Uncomment to blocking wait for Serial connection
-while ( !Serial ) delay(10);
+#if CFG_DEBUG
+  // Blocking wait for connection when debug mode is enabled via IDE
+  while ( !Serial ) yield();
+#endif
+  
+  Serial.println("Bluefruit52 BLEUART Example");
+  Serial.println("---------------------------\n");
 
-  Serial.println("Bluefruit52 Beacon Example");
-  Serial.println("--------------------------\n");
+  // Setup the BLE LED to be enabled on CONNECT
+  // Note: This is actually the default behavior, but provided
+  // here in case you want to control this LED manually via PIN 19
+  Bluefruit.autoConnLed(true);
+
+  // Config the peripheral connection with maximum bandwidth 
+  // more SRAM required by SoftDevice
+  // Note: All config***() function must be called before begin()
+  Bluefruit.configPrphBandwidth(BANDWIDTH_MAX);
 
   Bluefruit.begin();
+  Bluefruit.setTxPower(4);    // Check bluefruit.h for supported values
+  //Bluefruit.setName(getMcuUniqueID()); // useful testing with multiple central connections
+  Bluefruit.Periph.setConnectCallback(connect_callback);
+  Bluefruit.Periph.setDisconnectCallback(disconnect_callback);
 
-  // off Blue LED for lowest power consumption
-  Bluefruit.autoConnLed(false);
-  Bluefruit.setTxPower(0);    // Check bluefruit.h for supported values
+  // To be consistent OTA DFU should be added first if it exists
+  bledfu.begin();
 
-  // Manufacturer ID is required for Manufacturer Specific Data
-  beacon.setManufacturer(MANUFACTURER_ID);
+  // Configure and Start Device Information Service
+  bledis.setManufacturer("Adafruit Industries");
+  bledis.setModel("Bluefruit Feather52");
+  bledis.begin();
 
-  // Setup the advertising packet
+  // Configure and Start BLE Uart Service
+  bleuart.begin();
+
+  // Start BLE Battery Service
+  blebas.begin();
+  blebas.write(100);
+
+  // Set up and start advertising
   startAdv();
 
-  Serial.printf("Broadcasting beacon with MANUFACTURER_ID = 0x%04X\n", MANUFACTURER_ID);
-  Serial.println("open your beacon app to test such as: nRF Beacon");
-  Serial.println("- on Android you may need to change the MANUFACTURER_ID to 0x0059");
-  Serial.println("- on iOS you may need to change the MANUFACTURER_ID to 0x004C");
-
-  // Suspend Loop() to save power, since we didn't have any code there
-  suspendLoop();
+  Serial.println("Please use Adafruit's Bluefruit LE app to connect in UART mode");
+  Serial.println("Once connected, enter character(s) that you wish to send");
 }
 
 void startAdv(void)
-{  
+{
   // Advertising packet
-  // Set the beacon payload using the BLEBeacon class populated
-  // earlier in this example
-  Bluefruit.Advertising.setBeacon(beacon);
+  Bluefruit.Advertising.addFlags(BLE_GAP_ADV_FLAGS_LE_ONLY_GENERAL_DISC_MODE);
+  Bluefruit.Advertising.addTxPower();
+
+  // Include bleuart 128-bit uuid
+  Bluefruit.Advertising.addService(bleuart);
 
   // Secondary Scan Response packet (optional)
   // Since there is no room for 'Name' in Advertising packet
@@ -82,20 +86,64 @@ void startAdv(void)
   
   /* Start Advertising
    * - Enable auto advertising if disconnected
+   * - Interval:  fast mode = 20 ms, slow mode = 152.5 ms
    * - Timeout for fast mode is 30 seconds
    * - Start(timeout) with timeout = 0 will advertise forever (until connected)
    * 
-   * Apple Beacon specs
-   * - Type: Non-connectable, scannable, undirected
-   * - Fixed interval: 100 ms -> fast = slow = 100 ms
+   * For recommended advertising interval
+   * https://developer.apple.com/library/content/qa/qa1931/_index.html   
    */
-  Bluefruit.Advertising.setType(BLE_GAP_ADV_TYPE_NONCONNECTABLE_SCANNABLE_UNDIRECTED);
   Bluefruit.Advertising.restartOnDisconnect(true);
-  Bluefruit.Advertising.setInterval(160, 160);    // in unit of 0.625 ms
+  Bluefruit.Advertising.setInterval(32, 244);    // in unit of 0.625 ms
   Bluefruit.Advertising.setFastTimeout(30);      // number of seconds in fast mode
   Bluefruit.Advertising.start(0);                // 0 = Don't stop advertising after n seconds  
 }
 
-void loop() {
-  // loop is already suspended, CPU will not run loop() at all
+void loop()
+{
+  // Forward data from HW Serial to BLEUART
+  while (Serial.available())
+  {
+    // Delay to wait for enough input, since we have a limited transmission buffer
+    delay(2);
+
+    uint8_t buf[64];
+    int count = Serial.readBytes(buf, sizeof(buf));
+    bleuart.write( buf, count );
+  }
+
+  // Forward from BLEUART to HW Serial
+  while ( bleuart.available() )
+  {
+    uint8_t ch;
+    ch = (uint8_t) bleuart.read();
+    Serial.write(ch);
+  }
+}
+
+// callback invoked when central connects
+void connect_callback(uint16_t conn_handle)
+{
+  // Get the reference to current connection
+  BLEConnection* connection = Bluefruit.Connection(conn_handle);
+
+  char central_name[32] = { 0 };
+  connection->getPeerName(central_name, sizeof(central_name));
+
+  Serial.print("Connected to ");
+  Serial.println(central_name);
+}
+
+/**
+ * Callback invoked when a connection is dropped
+ * @param conn_handle connection where this event happens
+ * @param reason is a BLE_HCI_STATUS_CODE which can be found in ble_hci.h
+ */
+void disconnect_callback(uint16_t conn_handle, uint8_t reason)
+{
+  (void) conn_handle;
+  (void) reason;
+
+  Serial.println();
+  Serial.print("Disconnected, reason = 0x"); Serial.println(reason, HEX);
 }
