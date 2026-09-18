@@ -1,6 +1,7 @@
 // Arduino Example Code snippet
 #include <Arduino.h>
 #include <Adafruit_NeoPixel.h>
+#include "battery_charging.h"
 #define VBATPIN A6
 
 Adafruit_NeoPixel batteryLed(NEOPIXEL_NUM, PIN_NEOPIXEL, NEO_GRB + NEO_KHZ800);
@@ -26,25 +27,30 @@ void updateBatteryLed(float voltage) {
 	batteryLed.show();
 }
 
-void setup() {
-	Serial.begin(115200);
+void setupBatteryCharging() {
 	batteryLed.begin();
-	batteryLed.setBrightness(128);
+	batteryLed.setBrightness(64);
 	batteryLed.clear();
 	batteryLed.show();
 }
 
-void loop() {
+void updateBatteryCharging() {
+	static uint32_t lastUpdate = 0;
+	if (millis() - lastUpdate < 1000) {
+		return;
+	}
+	lastUpdate = millis();
+
 	float measuredvbat = analogRead(VBATPIN);
 	measuredvbat *= 2;
 	measuredvbat *= 3.6;
 	measuredvbat /= 1024;
 	updateBatteryLed(measuredvbat);
 
-	Serial.print("VBATPIN: ");
-	Serial.println(VBATPIN);
+	//Serial.print("VBATPIN: ");
+	//Serial.println(VBATPIN);
 	Serial.print("VBat: ");
 	Serial.println(measuredvbat);
 
-	delay(1000);
+	//delay(1000);
 }

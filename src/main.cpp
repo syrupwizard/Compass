@@ -1,22 +1,17 @@
-// Arduino Example Code snippet
 #include <Arduino.h>
-#include <Wire.h>
-#define VBATPIN A6
+#include "ahrs.h"
+#include "battery_charging.h"
+#include "ble.h"
 
 void setup() {
 	Serial.begin(115200);
+	setupAHRS();
+	setupBatteryCharging();
+	setupBLE();
 }
 
 void loop() {
-	float measuredvbat = analogRead(VBATPIN);
-	measuredvbat *= 2;
-	measuredvbat *= 3.6;
-	measuredvbat /= 1024;
-
-	Serial.print("VBATPIN: ");
-	Serial.println(VBATPIN);
-	Serial.print("VBat: ");
-	Serial.println(measuredvbat);
-
-	delay(1000);
+	updateAHRS();
+	updateBatteryCharging();
+	updateBLE();
 }
