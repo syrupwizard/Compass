@@ -1,10 +1,12 @@
+adafruit/Adafruit Unified Sensor@^1.1.15
+adafruit/Adafruit Sensor Calibration@^1.1.5
+adafruit/Adafruit LSM6DS
+adafruit/SdFat - Adafruit Fork@^2.3.103
 adafruit/Adafruit SPIFlash@^5.1.1
 adafruit/Adafruit AHRS@^2.4.0
-bblanchon/ArduinoJson@^7.2.2
 adafruit/Adafruit TinyUSB Library@^3.7.7
-adafruit/SdFat - Adafruit Fork@^2.3.103
+bblanchon/ArduinoJson@^7.2.2
+adafruit/Adafruit LIS3MDL
 symlink:///Users/austin/Library/Arduino15/packages/adafruit/hardware/nrf52/1.7.0/libraries/Adafruit_TinyUSB_Arduino
-adafruit/Adafruit Unified Sensor@^1.1.15
 adafruit/Adafruit NeoPixel@^1.12.3
-adafruit/Adafruit Sensor Calibration@^1.1.5
 symlink:///Users/austin/Library/Arduino15/packages/adafruit/hardware/nrf52/1.7.0/libraries/SPI
