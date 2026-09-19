@@ -1,4 +1,4 @@
-// BLE UART quaternion stream + Device Information + Battery,
+// BLE UART stream "heading,qw,qx,qy,qz" + Device Information + Battery,
 // using the calibrated AHRS module (ahrs.cpp / ahrs.h).
 #include <bluefruit.h>
 #include "ahrs.h"
@@ -77,11 +77,13 @@ void loop()
     if (++send_count >= SEND_EVERY_N_UPDATES) {
       send_count = 0;
 
+      float heading = getAHRSTrueHeading();   // degrees, 0-360, true north
       float qw, qx, qy, qz;
       getAHRSQuaternion(&qw, &qx, &qy, &qz);
 
       char line[48];
-      int n = snprintf(line, sizeof(line), "%.3f,%.3f,%.3f,%.3f\n", qw, qx, qy, qz);
+      int n = snprintf(line, sizeof(line), "%.1f,%.3f,%.3f,%.3f,%.3f\n",
+                       heading, qw, qx, qy, qz);
       if (Bluefruit.connected() && bleuart.notifyEnabled()) {
         bleuart.write((uint8_t*)line, n);
       }

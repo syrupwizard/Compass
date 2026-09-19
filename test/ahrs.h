@@ -8,6 +8,3 @@ bool updateAHRS();
 
 // Latest quaternion from the fusion filter.
 void getAHRSQuaternion(float *w, float *x, float *y, float *z);
-
-// Declination-corrected compass heading, 0-360 degrees (true north).
-float getAHRSTrueHeading();

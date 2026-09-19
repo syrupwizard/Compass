@@ -19,20 +19,7 @@ Adafruit_Sensor_Calibration_SDFat cal;
 #define FILTER_UPDATE_RATE_HZ 100
 #define PRINT_EVERY_N_UPDATES 10
 
-// Magnetic declination for your location, degrees, east positive.
-#define DECLINATION_DEG 14.5f
-
-// 1 = print labeled values for the Arduino Serial Plotter
-// 0 = your original "Orientation: / Quaternion:" text lines
-#define SERIAL_PLOTTER 1
-
 uint32_t timestamp;
-
-static float wrap360(float a) {
-  a = fmodf(a, 360.0f);
-  if (a < 0) a += 360.0f;
-  return a;
-}
 
 void setupAHRS() {
   // CHANGED: wait for USB serial at most 2 s, so the board still boots on battery
@@ -106,13 +93,6 @@ bool updateAHRS() {
       float roll = filter.getRoll();
       float pitch = filter.getPitch();
       float heading = filter.getYaw();
-#if SERIAL_PLOTTER
-      // Labeled "name:value" pairs, one line per sample, for the Serial Plotter
-      Serial.print("TrueHeading:");
-      Serial.print(wrap360(heading + DECLINATION_DEG), 1);
-      Serial.print(",MagHeading:");
-      Serial.println(wrap360(heading), 1);
-#else
       Serial.print("Orientation: ");
       Serial.print(heading);
       Serial.print(", ");
@@ -130,19 +110,13 @@ bool updateAHRS() {
       Serial.print(qy, 4);
       Serial.print(", ");
       Serial.println(qz, 4);
-#endif
     }
   }
 
   return true;
 }
 
-// NEW: declination-corrected compass heading, 0-360 deg (true north)
-float getAHRSTrueHeading() {
-  return wrap360(filter.getYaw() + DECLINATION_DEG);
-}
-
-// NEW: lets the main sketch grab the latest quaternion
+// NEW: lets the main sketch grab the latest quaternion for BLE
 void getAHRSQuaternion(float *w, float *x, float *y, float *z) {
   filter.getQuaternion(w, x, y, z);
 }
