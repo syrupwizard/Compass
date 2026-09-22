@@ -122,3 +122,9 @@ bool updateAHRS() {
 void getAHRSQuaternion(float *w, float *x, float *y, float *z) {
   filter.getQuaternion(w, x, y, z);
 }
+
+// NEW: lets the main sketch grab the latest heading, TEMP FIX TIL I FIGURE OUT Qs
+void getAHRSHeading(float *heading) {
+  float raw = filter.getYaw();
+  *heading = fmodf(360.0f - raw, 360.0f);   // mirrors direction, keeps 0°=North fixed
+}

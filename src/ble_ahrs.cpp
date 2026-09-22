@@ -80,12 +80,13 @@ void loop()
 
       float qw, qx, qy, qz;
       getAHRSQuaternion(&qw, &qx, &qy, &qz);
-      //
-      float heading = atan2f(2.0F * (qw * qz + qx * qy),
-                 1.0F - 2.0F * (qy * qy + qz * qz)) *
-              57.2957795F;
-      if (heading < 0.0F) heading += 360.0F;
-      //
+      
+      
+      // NEW: heading from filter.getYaw(), which is already 0-360°
+      float heading;
+      getAHRSHeading(&heading);
+      //------------------------
+      // create the text buffer to send over heading and quaternion data via BLE UART
       char line[64];
       int n = snprintf(line, sizeof(line), "%.3f,%.3f,%.3f,%.3f,%.3f\n",
                heading, qw, qx, qy, qz);
@@ -94,7 +95,7 @@ void loop()
       }
     }
   }
-
+    // send battery level every BATTERY_INTERVAL_MS milliseconds over BLE BAS (Battery Service)
   if (millis() - last_batt_ms >= BATTERY_INTERVAL_MS) {
     last_batt_ms = millis();
     uint8_t pct = readBatteryPercent();
