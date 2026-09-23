@@ -1,21 +1,23 @@
-// BLE UART quaternion stream + Device Information + Battery,
-// using the calibrated AHRS module (ahrs.cpp / ahrs.h).
+// main file which implements the BLE interface and calls ahrs and calibration modules
+// 
 #include <bluefruit.h>
 #include <math.h>
 #include "ahrs.h"
+#include "sensor_calibration/sensor_calibration.h"
 
 #define SEND_EVERY_N_UPDATES  4           // 100 Hz filter / 4 = 25 Hz over BLE
-#define BATTERY_INTERVAL_MS   30000
+#define BATTERY_INTERVAL_MS   30000       //30 seconds
 
 #define VBAT_MV_PER_LSB   (0.73242188F)   // 3.0 V / 4096
 #define VBAT_DIVIDER_COMP (2.0F)          // 2:1 divider on the Feather Sense
 
-BLEUart bleuart;
-BLEDis  bledis;
-BLEBas  blebas;
+BLEUart bleuart; // UART handles rest of data I/O
+BLEDis  bledis; // device information service
+BLEBas  blebas; //battery service
 
 uint32_t last_batt_ms = 0;
 uint8_t  send_count   = 0;
+bool usbCalibrationMode = false;
 
 uint8_t readBatteryPercent()
 {
@@ -54,7 +56,7 @@ void setup()
   Bluefruit.configPrphConn(92, BLE_GAP_EVENT_LENGTH_MIN, 16, 16);  // before begin()
   Bluefruit.begin();
   Bluefruit.setTxPower(4);
-  Bluefruit.setName("Sense AHRS");
+  Bluefruit.setName("Bluefruit Compass");
 
   char serial[17];
   snprintf(serial, sizeof(serial), "%08lX%08lX",
@@ -74,7 +76,19 @@ void setup()
 
 void loop()
 {
-  if (updateAHRS()) {                       // true once per filter step (100 Hz)
+  //check for usb serial connection -> enter calibration mode
+  if (Serial) {
+    if (!usbCalibrationMode) {
+      usbCalibrationMode = true;
+      beginCalibrationSession();
+    }
+    handleCalibrationSerial();
+  } else if (usbCalibrationMode) {
+    endCalibrationSession();
+    usbCalibrationMode = false;
+  }
+// otherwise do normal AHRS
+  if (!usbCalibrationMode && updateAHRS()) { // true once per filter step (100 Hz)
     if (++send_count >= SEND_EVERY_N_UPDATES) {
       send_count = 0;
 

@@ -58,6 +58,11 @@ void setupAHRS() {
   Wire.setClock(400000);
 }
 
+Adafruit_Sensor *getAHRSAccelerometer() { return accelerometer; }
+Adafruit_Sensor *getAHRSGyroscope() { return gyroscope; }
+Adafruit_Sensor *getAHRSMagnetometer() { return magnetometer; }
+Adafruit_Sensor_Calibration *getAHRSCalibration() { return &cal; }
+
 // CHANGED: returns bool (true = filter ran this call) instead of void
 bool updateAHRS() {
   static uint8_t counter = 0;

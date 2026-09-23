@@ -6,13 +6,19 @@
 //   p  print current values      s  save to flash      l  load from flash
 //   z  reset to defaults (RAM only until you save)      ?  help
 //
-// Results are stored with Adafruit_Sensor_Calibration, the same helper your AHRS
-// sketch loads and applies with cal.calibrate(), so nothing changes on that side.
-// Send one character per command from the Serial Monitor (Ctrl-Enter / Send).
+// Results are stored with Adafruit_Sensor_Calibration, the same helper used by
+// the AHRS firmware. Send one character per command from the Serial Monitor.
 
 #include <Arduino.h>
 #include <Adafruit_Sensor_Calibration.h>
 
+#if defined(AHRS_INTEGRATED_CALIBRATION)
+#include "../ahrs.h"
+#define accelerometer getAHRSAccelerometer()
+#define gyroscope getAHRSGyroscope()
+#define magnetometer getAHRSMagnetometer()
+#define cal (*getAHRSCalibration())
+#else
 Adafruit_Sensor *accelerometer, *gyroscope, *magnetometer;
 
 #include "LSM6DS_LIS3MDL.h"   // same sensor setup as your AHRS sketch (copy it into this folder)
@@ -21,6 +27,7 @@ Adafruit_Sensor *accelerometer, *gyroscope, *magnetometer;
 Adafruit_Sensor_Calibration_EEPROM cal;
 #else
 Adafruit_Sensor_Calibration_SDFat cal;
+#endif
 #endif
 
 #define GRAVITY_MS2      9.80665f
@@ -37,10 +44,14 @@ static void flushInput() {
   while (Serial.available()) Serial.read();
 }
 
-static void waitForKey() {
+static bool waitForKey() {
   flushInput();
-  while (!Serial.available()) yield();
+  while (!Serial.available()) {
+    if (!Serial) return false;
+    yield();
+  }
   flushInput();
+  return true;
 }
 
 static void printVec(const char *label, const float v[3], int digits = 4) {
@@ -58,6 +69,7 @@ static bool captureStill(Adafruit_Sensor *s, int n, float maxStd, float mean[3])
   mean[0] = mean[1] = mean[2] = 0;
 
   for (int k = 1; k <= n; k++) {
+    if (!Serial) return false;
     sensors_event_t e;
     s->getEvent(&e);
     for (int i = 0; i < 3; i++) {
@@ -82,24 +94,25 @@ static bool captureStill(Adafruit_Sensor *s, int n, float maxStd, float mean[3])
 
 // ------------------------------------------------------------------- gyro ---
 
-static void calibrateGyro() {
+static bool calibrateGyro() {
   Serial.println(F("\n== Gyro =="));
   Serial.println(F("Put the board on a still surface and don't touch it."));
   Serial.println(F("Send any character to start (takes about 5 s)."));
-  waitForKey();
+  if (!waitForKey()) return false;
 
   float mean[3];
   if (!captureStill(gyroscope, GYRO_SAMPLES, GYRO_MAX_STD, mean)) {
     Serial.println(F("Board moved. Gyro calibration NOT changed. Try again."));
-    return;
+    return true;
   }
   for (int i = 0; i < 3; i++) cal.gyro_zerorate[i] = mean[i];
   printVec("Gyro zero-rate (rad/s): ", cal.gyro_zerorate);
+  return true;
 }
 
 // ------------------------------------------------------------------ accel ---
 
-static void calibrateAccel() {
+static bool calibrateAccel() {
   static const struct { const char *name; int axis; int sign; } pos[6] = {
     {"+Z up   (flat, component side up)",        2, +1},
     {"-Z up   (flat, upside down)",              2, -1},
@@ -124,6 +137,7 @@ static void calibrateAccel() {
 
       flushInput();
       while (!Serial.available()) {
+        if (!Serial) return false;
         sensors_event_t e;
         accelerometer->getEvent(&e);
         Serial.print(F("  x="));
@@ -139,6 +153,7 @@ static void calibrateAccel() {
       Serial.print(F("  sampling"));
       float mean[3];
       if (!captureStill(accelerometer, ACCEL_SAMPLES, ACCEL_MAX_STD, mean)) {
+        if (!Serial) return false;
         Serial.println(F("  Board moved. Try this position again."));
         continue;
       }
@@ -167,23 +182,25 @@ static void calibrateAccel() {
     Serial.print((scale - 1.0f) * 100.0f, 2);
     Serial.println(F(" % (not corrected)"));
   }
+  return true;
 }
 
 // -------------------------------------------------------------------- mag ---
 
-static void calibrateMag() {
+static bool calibrateMag() {
   Serial.println(F("\n== Magnetometer =="));
   Serial.println(F("Keep the board away from metal, magnets, laptops and phones."));
   Serial.println(F("After starting, rotate it slowly through EVERY orientation: figure-eights,"));
   Serial.println(F("flips, all faces up and down, all headings. Send any character to finish"));
   Serial.println(F("once the min/max values stop changing. Send any character to start."));
-  waitForKey();
+  if (!waitForKey()) return false;
 
   float mn[3] = {1e9f, 1e9f, 1e9f};
   float mx[3] = {-1e9f, -1e9f, -1e9f};
   uint32_t lastPrint = 0;
 
   while (!Serial.available()) {
+    if (!Serial) return false;
     sensors_event_t e;
     magnetometer->getEvent(&e);
     for (int i = 0; i < 3; i++) {
@@ -206,7 +223,7 @@ static void calibrateMag() {
       Serial.print(F("Axis "));
       Serial.print(i);
       Serial.println(F(" barely changed: rotate through more orientations. Mag calibration NOT changed."));
-      return;
+      return true;
     }
   }
   float avg = (radius[0] + radius[1] + radius[2]) / 3.0f;
@@ -229,6 +246,7 @@ static void calibrateMag() {
     Serial.println(F("  WARNING: Earth's field is roughly 25-65 uT. This value is outside that,"));
     Serial.println(F("  so coverage was probably poor or something magnetic was nearby. Redo it."));
   }
+  return true;
 }
 
 // ------------------------------------------------------------------- misc ---
@@ -267,9 +285,9 @@ static void printHelp() {
   Serial.println(F("  s  save to flash"));
   Serial.println(F("  l  load from flash"));
   Serial.println(F("  z  reset to defaults (RAM only)"));
-  Serial.println(F("  ?  this help"));
 }
 
+#if !defined(AHRS_INTEGRATED_CALIBRATION)
 void setup() {
   Serial.begin(115200);
   while (!Serial) delay(10);   // bench tool: wait for the Serial Monitor
@@ -321,7 +339,57 @@ void loop() {
         Serial.println(F("**WARNING** couldn't save calibration"));
       }
       break;
-    case '?': printHelp(); break;
     default:  break;   // ignore newlines and stray characters
   }
 }
+#else
+static bool calibrationSessionStarted = false;
+
+void beginCalibrationSession() {
+  if (calibrationSessionStarted || !Serial) return;
+  calibrationSessionStarted = true;
+  delay(1000);
+  Serial.println(F("\nSensor calibration over USB Serial"));
+  printCal();
+  printHelp();
+}
+
+void endCalibrationSession() {
+  calibrationSessionStarted = false;
+}
+
+bool calibrationSessionActive() {
+  return calibrationSessionStarted && Serial;
+}
+
+void handleCalibrationSerial() {
+  if (!calibrationSessionActive() || !Serial.available()) return;
+
+  char c = Serial.read();
+  switch (c) {
+    case 'a': calibrateAccel(); break;
+    case 'g': calibrateGyro();  break;
+    case 'm': calibrateMag();   break;
+    case 'p': printCal();       break;
+    case 'z': resetCal();       break;
+    case 'l':
+      if (cal.loadCalibration()) {
+        Serial.println(F("Loaded from flash."));
+        printCal();
+      } else {
+        Serial.println(F("Nothing loaded (no saved calibration found)."));
+      }
+      break;
+    case 's':
+      if (cal.saveCalibration()) {
+        Serial.println(F("Saved. Contents of flash:"));
+        cal.printSavedCalibration();
+      } else {
+        Serial.println(F("**WARNING** couldn't save calibration"));
+      }
+      break;
+
+    default: break;
+  }
+}
+#endif
