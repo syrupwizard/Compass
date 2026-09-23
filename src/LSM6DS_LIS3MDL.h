@@ -29,7 +29,12 @@ void setup_sensors(void) {
   // set slightly above refresh rate
   lsm6ds.setAccelDataRate(LSM6DS_RATE_104_HZ);
   lsm6ds.setGyroDataRate(LSM6DS_RATE_104_HZ);
-  lis3mdl.setDataRate(LIS3MDL_DATARATE_1000_HZ);
-  lis3mdl.setPerformanceMode(LIS3MDL_MEDIUMMODE);
+  // OLD: adjust this for better performance as compass?
+  // lis3mdl.setDataRate(LIS3MDL_DATARATE_1000_HZ);
+  // lis3mdl.setPerformanceMode(LIS3MDL_MEDIUMMODE);
+  // lis3mdl.setOperationMode(LIS3MDL_CONTINUOUSMODE);
+  // NEW:
+  lis3mdl.setPerformanceMode(LIS3MDL_ULTRAHIGHMODE);
+  lis3mdl.setDataRate(LIS3MDL_DATARATE_155_HZ);
   lis3mdl.setOperationMode(LIS3MDL_CONTINUOUSMODE);
 }

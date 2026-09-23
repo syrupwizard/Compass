@@ -122,9 +122,14 @@ bool updateAHRS() {
 void getAHRSQuaternion(float *w, float *x, float *y, float *z) {
   filter.getQuaternion(w, x, y, z);
 }
-
+#define MAGNETIC_DECLINATION_DEG  14.5f
 // NEW: lets the main sketch grab the latest heading, TEMP FIX TIL I FIGURE OUT Qs
 void getAHRSHeading(float *heading) {
   float raw = filter.getYaw();
-  *heading = fmodf(360.0f - raw, 360.0f);   // mirrors direction, keeps 0°=North fixed
+  float adjusted = 360.0f - (raw + MAGNETIC_DECLINATION_DEG);
+  adjusted = fmodf(adjusted, 360.0f);
+  if (adjusted < 0.0f) {
+    adjusted += 360.0f;
+  }
+  *heading = adjusted;  // mirrors direction, keeps 0°=North fixed, and keeps heading in [0, 360)
 }
