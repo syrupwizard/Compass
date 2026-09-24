@@ -6,11 +6,10 @@ import asyncio
 import struct
 
 from bleak import BleakClient, BleakScanner
+import asyncio; from bleak import BleakScanner; devices = asyncio.run(BleakScanner.discover(timeout=8)); print("\n".join(f"{d.name!r} | {d.address}" for d in devices))
 
-
-DEFAULT_DEVICE_NAME = "Compass"
-DEFAULT_CHARACTERISTIC_UUID = "7c6e0002-7f8a-4c2d-9b11-2d8f4f3a1000"
-
+DEFAULT_DEVICE_NAME = "Bluefruit Compass"
+DEFAULT_CHARACTERISTIC_UUID = "6e400003-b5a3-f393-e0a9-e50e24dcca9e"
 
 def decode_quaternion(data: bytearray) -> tuple[float, float, float, float]:
     """Decode the firmware's 16-byte little-endian float payload."""
