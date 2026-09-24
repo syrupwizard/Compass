@@ -16,7 +16,7 @@ Adafruit_Sensor_Calibration_EEPROM cal;
 Adafruit_Sensor_Calibration_SDFat cal;
 #endif
 
-#define FILTER_UPDATE_RATE_HZ 100
+#define FILTER_UPDATE_RATE_HZ 50
 #define PRINT_EVERY_N_UPDATES 10
 
 uint32_t timestamp;

@@ -28,7 +28,7 @@ try:
     from bleak import BleakClient, BleakScanner
     from bleak.exc import BleakError
 except ImportError:
-    sys.exit("This script needs the 'bleak' package:  python -m pip install bleak")
+    sys.exit("This script needs the 'bleak' package")
 
 # Nordic UART Service, as exposed by Adafruit's BLEUart
 UART_SERVICE_UUID = "6e400001-b5a3-f393-e0a9-e50e24dcca9e"

@@ -10,6 +10,7 @@
 // the AHRS firmware. Send one character per command from the Serial Monitor.
 
 #include <Arduino.h>
+#include <math.h>
 #include <Adafruit_Sensor_Calibration.h>
 
 #if defined(AHRS_INTEGRATED_CALIBRATION)
@@ -32,10 +33,12 @@ Adafruit_Sensor_Calibration_SDFat cal;
 
 #define GRAVITY_MS2      9.80665f
 #define ACCEL_SAMPLES    300       // ~3 s per position
-#define GYRO_SAMPLES     500       // ~5 s
+#define GYRO_SAMPLES     500       // ~5 s, captured as two halves
+#define GYRO_SETTLE_MS   1500      // wait after the keypress so desk vibration dies out
 #define SAMPLE_DELAY_MS  10
 #define ACCEL_MAX_STD    0.15f     // m/s^2: reject a position if the board moved
-#define GYRO_MAX_STD     0.02f     // rad/s: reject if the board moved
+#define GYRO_MAX_STD     0.005f    // rad/s: reject if the board moved (sensor noise is ~0.001-0.002)
+#define GYRO_MAX_DRIFT   0.002f    // rad/s: max difference between the two halves' means
 
 // ---------------------------------------------------------------- helpers ---
 
@@ -64,7 +67,8 @@ static void printVec(const char *label, const float v[3], int digits = 4) {
 
 // Average n samples from a sensor. Returns false if any axis' standard
 // deviation exceeds maxStd, which means the board was moving.
-static bool captureStill(Adafruit_Sensor *s, int n, float maxStd, float mean[3]) {
+static bool captureStill(Adafruit_Sensor *s, int n, float maxStd, float mean[3],
+                         float *sdOut = nullptr) {
   float m2[3] = {0, 0, 0};
   mean[0] = mean[1] = mean[2] = 0;
 
@@ -88,7 +92,8 @@ static bool captureStill(Adafruit_Sensor *s, int n, float maxStd, float mean[3])
     sd[i] = sqrtf(m2[i] / (n - 1));
     if (sd[i] > maxStd) ok = false;
   }
-  if (!ok) printVec("  std dev too high: ", sd);
+  if (sdOut) for (int i = 0; i < 3; i++) sdOut[i] = sd[i];
+  if (!ok) printVec("  std dev too high: ", sd, 5);
   return ok;
 }
 
@@ -96,17 +101,54 @@ static bool captureStill(Adafruit_Sensor *s, int n, float maxStd, float mean[3])
 
 static bool calibrateGyro() {
   Serial.println(F("\n== Gyro =="));
-  Serial.println(F("Put the board on a still surface and don't touch it."));
-  Serial.println(F("Send any character to start (takes about 5 s)."));
+  Serial.println(F("Put the board on a still surface and don't touch it or the table."));
+  Serial.println(F("Send any character to start. It waits a moment for vibration to settle,"));
+  Serial.println(F("then samples for about 5 s. For best repeatability, let the board warm up"));
+  Serial.println(F("for a couple of minutes first."));
   if (!waitForKey()) return false;
 
-  float mean[3];
-  if (!captureStill(gyroscope, GYRO_SAMPLES, GYRO_MAX_STD, mean)) {
+  Serial.print(F("Settling"));
+  for (int t = 0; t < GYRO_SETTLE_MS; t += 250) {
+    if (!Serial) return false;
+    Serial.print('.');
+    delay(250);
+  }
+  Serial.println();
+
+  // Two half-length captures: each must be quiet, and they must agree with each
+  // other. That catches bumps, slow tilting and settling that one long average hides.
+  float first[3], second[3], sd[3];
+  if (!captureStill(gyroscope, GYRO_SAMPLES / 2, GYRO_MAX_STD, first) ||
+      !captureStill(gyroscope, GYRO_SAMPLES / 2, GYRO_MAX_STD, second, sd)) {
+    if (!Serial) return false;
     Serial.println(F("Board moved. Gyro calibration NOT changed. Try again."));
     return true;
   }
-  for (int i = 0; i < 3; i++) cal.gyro_zerorate[i] = mean[i];
-  printVec("Gyro zero-rate (rad/s): ", cal.gyro_zerorate);
+
+  float mean[3];
+  bool stable = true;
+  for (int i = 0; i < 3; i++) {
+    mean[i] = 0.5f * (first[i] + second[i]);
+    if (fabsf(first[i] - second[i]) > GYRO_MAX_DRIFT) stable = false;
+  }
+  if (!stable) {
+    printVec("  first half  (rad/s): ", first, 5);
+    printVec("  second half (rad/s): ", second, 5);
+    Serial.println(F("Readings changed during sampling (bump, vibration or warm-up)."));
+    Serial.println(F("Gyro calibration NOT changed. Try again."));
+    return true;
+  }
+
+  float dps[3], change[3];
+  for (int i = 0; i < 3; i++) {
+    dps[i] = mean[i] * RAD_TO_DEG;
+    change[i] = (mean[i] - cal.gyro_zerorate[i]) * RAD_TO_DEG;
+    cal.gyro_zerorate[i] = mean[i];
+  }
+  printVec("Gyro zero-rate (rad/s):     ", cal.gyro_zerorate, 5);
+  printVec("  in deg/s:                 ", dps, 3);
+  printVec("  change vs previous (deg/s): ", change, 3);
+  printVec("  noise, std dev (rad/s):   ", sd, 5);
   return true;
 }
 
