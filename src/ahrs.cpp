@@ -72,15 +72,7 @@ bool updateAHRS() {
   }
   timestamp = millis();
 
-  // TEMP diagnostic — drop into updateAHRS() right where timestamp is updated
-static uint32_t lastCallUs = 0;
-uint32_t nowUs = micros();
-if (lastCallUs != 0) {
-  int32_t intervalUs = nowUs - lastCallUs;
-  Serial.println(intervalUs);   // watch for spikes above ~10000
-}
-lastCallUs = nowUs;
-//--------
+
 
   sensors_event_t accel, gyro, mag;
   accelerometer->getEvent(&accel);
