@@ -6,16 +6,25 @@ import asyncio
 import struct
 
 from bleak import BleakClient, BleakScanner
-import asyncio; from bleak import BleakScanner; devices = asyncio.run(BleakScanner.discover(timeout=8)); print("\n".join(f"{d.name!r} | {d.address}" for d in devices))
 
-DEFAULT_DEVICE_NAME = "Bluefruit Compass"
+UART_SERVICE_UUID = "6e400001-b5a3-f393-e0a9-e50e24dcca9e"
 DEFAULT_CHARACTERISTIC_UUID = "6e400003-b5a3-f393-e0a9-e50e24dcca9e"
 
 def decode_quaternion(data: bytearray) -> tuple[float, float, float, float]:
-    """Decode the firmware's 16-byte little-endian float payload."""
-    if len(data) != 16:
-        raise ValueError(f"expected 16 bytes, received {len(data)}")
-    return struct.unpack("<4f", data)
+    """Decode binary quaternion data or CSV data from the Compass firmware."""
+    if len(data) == 16:
+        return struct.unpack("<4f", data)
+
+    try:
+        values = [float(value) for value in data.decode().strip().split(",")]
+    except (UnicodeDecodeError, ValueError) as error:
+        raise ValueError(f"unrecognized quaternion packet: {data!r}") from error
+
+    if len(values) == 5:
+        return tuple(values[1:])
+    if len(values) == 4:
+        return tuple(values)
+    raise ValueError(f"expected 4 or 5 CSV values, received {len(values)}")
 
 
 def print_quaternion(data: bytearray) -> None:
@@ -27,10 +36,17 @@ def print_quaternion(data: bytearray) -> None:
     print(f"w={w:.6f}, x={x:.6f}, y={y:.6f}, z={z:.6f}")
 
 
-async def find_device(name: str):
-    print(f"Scanning for {name!r}...")
-    for device in await BleakScanner.discover():
-        if device.name == name:
+async def find_device(name: str | None, service_uuid: str):
+    print(f"Scanning for devices advertising {service_uuid}...")
+    discovered = await BleakScanner.discover(return_adv=True)
+    service_uuid = service_uuid.lower()
+    for device, advertisement in discovered.values():
+        advertised_services = {
+            uuid.lower() for uuid in advertisement.service_uuids
+        }
+        if service_uuid in advertised_services and (
+            name is None or device.name == name
+        ):
             return device
     return None
 
@@ -38,11 +54,16 @@ async def find_device(name: str):
 async def receive_quaternions(
     device_name: str,
     address: str | None,
+    service_uuid: str,
     characteristic_uuid: str,
 ) -> None:
-    device = await find_device(device_name) if address is None else address
+    device = (
+        await find_device(device_name, service_uuid)
+        if address is None
+        else address
+    )
     if device is None:
-        raise RuntimeError(f"could not find BLE device {device_name!r}")
+        raise RuntimeError(f"could not find a device advertising {service_uuid!r}")
 
     device_address = device if isinstance(device, str) else device.address
     print(f"Connecting to {device_address}...")
@@ -64,8 +85,17 @@ async def receive_quaternions(
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--name", default=DEFAULT_DEVICE_NAME)
+    parser.add_argument(
+        "--name",
+        default=None,
+        help="optional BLE device name filter",
+    )
     parser.add_argument("--address", help="BLE address or macOS device UUID")
+    parser.add_argument(
+        "--service",
+        default=UART_SERVICE_UUID,
+        help="BLE service UUID used to identify compatible devices",
+    )
     parser.add_argument(
         "--characteristic",
         default=DEFAULT_CHARACTERISTIC_UUID,
@@ -77,7 +107,14 @@ def parse_args() -> argparse.Namespace:
 def main() -> None:
     args = parse_args()
     try:
-        asyncio.run(receive_quaternions(args.name, args.address, args.characteristic))
+        asyncio.run(
+            receive_quaternions(
+                args.name,
+                args.address,
+                args.service,
+                args.characteristic,
+            )
+        )
     except KeyboardInterrupt:
         print("\nDisconnected.")
 
