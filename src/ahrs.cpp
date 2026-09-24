@@ -16,7 +16,7 @@ Adafruit_Sensor_Calibration_EEPROM cal;
 Adafruit_Sensor_Calibration_SDFat cal;
 #endif
 
-#define FILTER_UPDATE_RATE_HZ 50
+#define FILTER_UPDATE_RATE_HZ 100
 #define PRINT_EVERY_N_UPDATES 1
 
 uint32_t timestamp;
@@ -129,7 +129,7 @@ bool updateAHRS() {
 void getAHRSQuaternion(float *w, float *x, float *y, float *z) {
   filter.getQuaternion(w, x, y, z);
 }
-#define MAGNETIC_DECLINATION_DEG  14.5f
+#define MAGNETIC_DECLINATION_DEG  -14.5f //14.5 degrees E, subtract from mag N to get true N
 // NEW: lets the main sketch grab the latest heading, TEMP FIX TIL I FIGURE OUT Qs
 void getAHRSHeading(float *heading) {
   float raw = filter.getYaw();
