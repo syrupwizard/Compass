@@ -17,7 +17,7 @@ Adafruit_Sensor_Calibration_SDFat cal;
 #endif
 
 #define FILTER_UPDATE_RATE_HZ 50
-#define PRINT_EVERY_N_UPDATES 10
+#define PRINT_EVERY_N_UPDATES 1
 
 uint32_t timestamp;
 
@@ -72,6 +72,16 @@ bool updateAHRS() {
   }
   timestamp = millis();
 
+  // TEMP diagnostic — drop into updateAHRS() right where timestamp is updated
+static uint32_t lastCallUs = 0;
+uint32_t nowUs = micros();
+if (lastCallUs != 0) {
+  int32_t intervalUs = nowUs - lastCallUs;
+  Serial.println(intervalUs);   // watch for spikes above ~10000
+}
+lastCallUs = nowUs;
+//--------
+
   sensors_event_t accel, gyro, mag;
   accelerometer->getEvent(&accel);
   gyroscope->getEvent(&gyro);
@@ -85,7 +95,7 @@ bool updateAHRS() {
   float gy = gyro.gyro.y * SENSORS_RADS_TO_DPS;
   float gz = gyro.gyro.z * SENSORS_RADS_TO_DPS;
 
-  filter.update(gx, -gy, gz,
+  filter.update(gx, gy, gz,
                 accel.acceleration.x, accel.acceleration.y, accel.acceleration.z,
                 mag.magnetic.x, mag.magnetic.y, mag.magnetic.z);
 
