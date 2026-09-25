@@ -14,7 +14,11 @@
 #include <Adafruit_Sensor_Calibration.h>
 
 #if defined(AHRS_INTEGRATED_CALIBRATION)
+#if defined(DEBUG_ENVIRONMENT)
+#include "../debug_environment/ahrs.h"
+#else
 #include "../ahrs.h"
+#endif
 #define accelerometer getAHRSAccelerometer()
 #define gyroscope getAHRSGyroscope()
 #define magnetometer getAHRSMagnetometer()

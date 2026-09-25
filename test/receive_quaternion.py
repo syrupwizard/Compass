@@ -35,6 +35,8 @@ def print_quaternion(data: bytearray) -> None:
         return
     print(f"w={w:.6f}, x={x:.6f}, y={y:.6f}, z={z:.6f}")
 
+    
+
 
 async def find_device(name: str | None, service_uuid: str):
     print(f"Scanning for devices advertising {service_uuid}...")

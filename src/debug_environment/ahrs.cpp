@@ -17,9 +17,12 @@ Adafruit_Sensor_Calibration_SDFat cal;
 #endif
 
 #define FILTER_UPDATE_RATE_HZ 100
-#define PRINT_EVERY_N_UPDATES 1
+#define PRINT_EVERY_N_UPDATES 4
 
 uint32_t timestamp;
+float latest_ax, latest_ay, latest_az;
+float latest_gx, latest_gy, latest_gz;
+float latest_mx, latest_my, latest_mz;
 
 void setupAHRS() {
   // CHANGED: wait for USB serial at most 2 s, so the board still boots on battery
@@ -87,56 +90,39 @@ bool updateAHRS() {
   float gy = gyro.gyro.y * SENSORS_RADS_TO_DPS;
   float gz = gyro.gyro.z * SENSORS_RADS_TO_DPS;
 
-  filter.update(gx, gy, gz,
-                accel.acceleration.x, accel.acceleration.y, accel.acceleration.z,
-                mag.magnetic.x, mag.magnetic.y, mag.magnetic.z);
+  //-gz -> yaw
+  //-gx -> pitch
+  //gy -> roll
 
-  // Same print cadence as before (counter++ <= N returns early)
-  // CHANGED: only print when a USB host is attached
-  if (counter++ > PRINT_EVERY_N_UPDATES) {
-    counter = 0;
+float gyro_roll = gy;
+float gyro_pitch = -gx;
+float gyro_yaw = -gz;
 
-    if (Serial) {
-      // float roll = filter.getRoll();
-      // float pitch = filter.getPitch();
-      // float heading = filter.getYaw();
-      // Serial.print("Orientation: ");
-      // Serial.print(heading);
-      // Serial.print(", ");
-      // Serial.print(pitch);
-      // Serial.print(", ");
-      // Serial.println(roll);
-
-      float qw, qx, qy, qz;
-      filter.getQuaternion(&qw, &qx, &qy, &qz);
-      //qx = -qx; qy = -qy; qz = -qz;   // conjugate: world->board becomes board->world
-      Serial.print("Quaternion: ");
-      Serial.print(qw, 4);
-      Serial.print(", ");
-      Serial.print(qx, 4);
-      Serial.print(", ");
-      Serial.print(qy, 4);
-      Serial.print(", ");
-      Serial.println(qz, 4);
-      //Serial.println("Inverted");
-    }
-  }
-
+  filter.update( gyro_roll, gyro_pitch, gyro_yaw,
+                -accel.acceleration.x, 
+                accel.acceleration.y, 
+                accel.acceleration.z,
+                mag.magnetic.x, 
+                -mag.magnetic.y, 
+                mag.magnetic.z);
   return true;
+
+
 }
 
 // NEW: lets the main sketch grab the latest quaternion
 void getAHRSQuaternion(float *w, float *x, float *y, float *z) {
   filter.getQuaternion(w, x, y, z);
 }
-#define MAGNETIC_DECLINATION_DEG  -14.5f //14.5 degrees E, subtract from mag N to get true N
-// NEW: lets the main sketch grab the latest heading, TEMP FIX TIL I FIGURE OUT Qs
-void getAHRSHeading(float *heading) {
-  float raw = filter.getYaw();
-  float adjusted = 360.0f - (raw + MAGNETIC_DECLINATION_DEG);
-  adjusted = fmodf(adjusted, 360.0f);
-  if (adjusted < 0.0f) {
-    adjusted += 360.0f;
-  }
-  *heading = adjusted;  // mirrors direction, keeps 0°=North fixed, and keeps heading in [0, 360)
+
+//lets the main sketch grab the latest heading, TEMP FIX TIL I FIGURE OUT Qs
+void getAHRSHeading(float *yaw, float *pitch, float *roll) {
+  *yaw = filter.getYaw();
+  *pitch = filter.getPitch();
+  *roll = filter.getRoll();
+
+  //correct but not correct
+  // *yaw = fmodf(360.0f - rawYaw, 360.0f);
+  // *pitch = -filter.getPitch();
+  // *roll = filter.getRoll();
 }

@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import math
 import sys
 import time
 
@@ -54,10 +55,22 @@ def parse_line(line: bytes) -> tuple[float, tuple[float, float, float, float]]:
 def handle_sample(heading: float, quat: tuple[float, float, float, float]) -> None:
     """Called once per decoded sample. Edit this to log, plot, forward, etc."""
     w, x, y, z = quat
-    print(f"heading={heading:6.1f}  w={w:7.3f}  x={x:7.3f}  y={y:7.3f}  z={z:7.3f}",
-          flush=True)
+    
+    roll  = math.atan2(2*(w*x+y*z), 1-2*(x*x+y*y))
+    pitch = math.asin(max(-1.0, min(1.0, 2*(w*y-z*x))))
+    yaw   = math.atan2(2*(w*z+x*y), 1-2*(y*y+z*z))
+    yaw_from_quat_deg = math.degrees(yaw) % 360
+    yaw_deg = math.degrees(yaw) % 360
+    roll_deg = math.degrees(roll) % 360
+    pitch_deg = math.degrees(pitch) % 360
+    
+    if min(abs(heading - yaw_from_quat_deg), 360 - abs(heading - yaw_from_quat_deg)) > 5:
+        print(f"MISMATCH: reported heading={heading:.1f}, quaternion-derived={yaw_from_quat_deg:.1f}")
 
+    print(f"heading={heading:6.1f}, yaw = {yaw_deg:6.1f}, pitch={pitch_deg:6.1f}, roll={roll_deg:6.1f}  w={w:7.3f}  x={x:7.3f}  y={y:7.3f}  z={z:7.3f}",
+              flush=True)
 
+    
 class LineReceiver:
     """Reassembles newline-terminated lines from arbitrarily split notifications."""
 

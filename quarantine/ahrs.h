@@ -18,4 +18,4 @@ bool updateAHRS();
 void getAHRSQuaternion(float *w, float *x, float *y, float *z);
 
 // NEW: latest fused heading (yaw), 0-360 degrees.
-void getAHRSHeading(float *heading);
+void getAHRSHeading(float *yaw, float *pitch, float *roll);
