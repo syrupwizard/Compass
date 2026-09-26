@@ -37,11 +37,13 @@ void loop()
   float yaw, pitch, roll;
   getAHRSHeading(&yaw, &pitch, &roll);
 
-  Serial.print(millis()); Serial.print(',');
+  // Serial.print(millis()); Serial.print(',');
+  Serial.print("Quaternion: ");
   Serial.print(qw, 4); Serial.print(',');
   Serial.print(qx, 4); Serial.print(',');
   Serial.print(qy, 4); Serial.print(',');
-  Serial.print(qz, 4); Serial.print(',');
+  Serial.print(qz, 4); Serial.println();
+
   Serial.print(yaw, 3); Serial.print(',');
   Serial.print(pitch, 3); Serial.print(',');
   Serial.print(roll, 3); Serial.println();

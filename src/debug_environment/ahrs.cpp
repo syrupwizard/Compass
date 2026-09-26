@@ -90,15 +90,26 @@ bool updateAHRS() {
   float gy = gyro.gyro.y * SENSORS_RADS_TO_DPS;
   float gz = gyro.gyro.z * SENSORS_RADS_TO_DPS;
 
+  
+  //gx -> roll
+   //-gy -> pitch
   //-gz -> yaw
-  //-gx -> pitch
-  //gy -> roll
+ 
 
-float gyro_roll = gy;
-float gyro_pitch = -gx;
+float gyro_roll = gx;
+float gyro_pitch = -gy;
 float gyro_yaw = -gz;
 
-  filter.update( gyro_roll, gyro_pitch, gyro_yaw,
+
+  // filter.update( gyro_roll, gyro_pitch, gyro_yaw,
+  //               -accel.acceleration.x, 
+  //               accel.acceleration.y, 
+  //               accel.acceleration.z,
+  //               mag.magnetic.x, 
+  //               -mag.magnetic.y, 
+  //               mag.magnetic.z);
+  // return true;
+ filter.update( gyro_roll, gyro_pitch, gyro_yaw,
                 -accel.acceleration.x, 
                 accel.acceleration.y, 
                 accel.acceleration.z,
@@ -106,7 +117,6 @@ float gyro_yaw = -gz;
                 -mag.magnetic.y, 
                 mag.magnetic.z);
   return true;
-
 
 }
 

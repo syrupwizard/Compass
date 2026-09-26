@@ -3,7 +3,7 @@
 //   a  accelerometer: 6-position zero-g offsets
 //   g  gyroscope:     zero-rate offsets (board held still)
 //   m  magnetometer:  hard-iron offsets + per-axis soft-iron scale (rotate the board)
-//   p  print current values      s  save to flash      l  load from flash
+//   p  print raw sensor data continuously            s  save to flash      l  load from flash
 //   z  reset to defaults (RAM only until you save)      ?  help
 //
 // Results are stored with Adafruit_Sensor_Calibration, the same helper used by
@@ -311,6 +311,46 @@ static void printCal() {
   Serial.println(cal.mag_field, 2);
 }
 
+static void printRawSensorData() {
+  sensors_event_t accelEvent, gyroEvent, magEvent;
+  accelerometer->getEvent(&accelEvent);
+  gyroscope->getEvent(&gyroEvent);
+  magnetometer->getEvent(&magEvent);
+
+  Serial.println(F("\nRaw sensor data:"));
+  Serial.print(F("  accel (m/s^2): "));
+  Serial.print(accelEvent.acceleration.x, 4);
+  Serial.print(F(", "));
+  Serial.print(accelEvent.acceleration.y, 4);
+  Serial.print(F(", "));
+  Serial.println(accelEvent.acceleration.z, 4);
+
+  Serial.print(F("  gyro (rad/s):  "));
+  Serial.print(gyroEvent.gyro.x, 5);
+  Serial.print(F(", "));
+  Serial.print(gyroEvent.gyro.y, 5);
+  Serial.print(F(", "));
+  Serial.println(gyroEvent.gyro.z, 5);
+
+  Serial.print(F("  mag (uT):      "));
+  Serial.print(magEvent.magnetic.x, 2);
+  Serial.print(F(", "));
+  Serial.print(magEvent.magnetic.y, 2);
+  Serial.print(F(", "));
+  Serial.println(magEvent.magnetic.z, 2);
+}
+
+static void printRawSensorDataLoop() {
+  flushInput();
+  Serial.println(F("\nPrinting raw sensor data. Send any character to stop."));
+  while (!Serial.available()) {
+    printRawSensorData();
+    delay(300);
+  }
+  flushInput();
+  Serial.println(F("Raw sensor data stopped."));
+}
+
 static void resetCal() {
   for (int i = 0; i < 3; i++) {
     cal.accel_zerog[i] = 0;
@@ -327,7 +367,7 @@ static void printHelp() {
   Serial.println(F("  a  calibrate accelerometer (6 positions)"));
   Serial.println(F("  g  calibrate gyro (keep still)"));
   Serial.println(F("  m  calibrate magnetometer (rotate the board)"));
-  Serial.println(F("  p  print current values"));
+  Serial.println(F("  p  print raw sensor data continuously (send any key to stop)"));
   Serial.println(F("  s  save to flash"));
   Serial.println(F("  l  load from flash"));
   Serial.println(F("  z  reset to defaults (RAM only)"));
@@ -367,7 +407,7 @@ void loop() {
     case 'a': calibrateAccel(); break;
     case 'g': calibrateGyro();  break;
     case 'm': calibrateMag();   break;
-    case 'p': printCal();       break;
+    case 'p': printRawSensorDataLoop(); break;
     case 'z': resetCal();       break;
     case 'l':
       if (cal.loadCalibration()) {
@@ -416,7 +456,7 @@ void handleCalibrationSerial() {
     case 'a': calibrateAccel(); break;
     case 'g': calibrateGyro();  break;
     case 'm': calibrateMag();   break;
-    case 'p': printCal();       break;
+    case 'p': printRawSensorDataLoop(); break;
     case 'z': resetCal();       break;
     case 'l':
       if (cal.loadCalibration()) {
