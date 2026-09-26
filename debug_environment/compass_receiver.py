@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """Auto-connecting BLE receiver for the Bluefruit Compass firmware.
 
-Run it and it will scan for the board, connect, and print heading, pitch, and
-roll samples. If the board resets, goes out of range, or isn't powered on yet,
-the script keeps scanning and reconnects by itself. Press Ctrl+C to quit.
+Run it and it will scan for the board, connect, and print heading + quaternion
+samples. If the board resets, goes out of range, or isn't powered on yet, the
+script keeps scanning and reconnects by itself. Press Ctrl+C to quit.
 
 Setup (Windows 10+, macOS, Linux, Raspberry Pi):
     python -m pip install bleak
@@ -14,13 +14,14 @@ Platform notes:
             (System Settings > Privacy & Security > Bluetooth).
     Windows Turn Bluetooth on; no pairing is needed.
 
-Firmware line format (25 Hz):  heading,pitch,roll\n
+Firmware line format (25 Hz):  heading,qw,qx,qy,qz\\n
 """
 
 from __future__ import annotations
 
 import argparse
 import asyncio
+import math
 import sys
 import time
 
@@ -40,25 +41,36 @@ MAX_BACKOFF_S = 10.0    # longest wait between reconnect attempts
 
 # ------------------------------------------------------------------ parsing --
 
-def parse_line(line: bytes) -> tuple[float, float, float]:
-    """Decode 'heading,pitch,roll' into (heading_deg, pitch_deg, roll_deg)."""
+def parse_line(line: bytes) -> tuple[float, tuple[float, float, float, float]]:
+    """Decode 'heading,qw,qx,qy,qz' into (heading_deg, (w, x, y, z))."""
     try:
         values = [float(v) for v in line.decode("ascii").strip().split(",")]
     except (UnicodeDecodeError, ValueError) as error:
         raise ValueError(f"unrecognized packet {line!r}") from error
-    if len(values) != 3:
-        raise ValueError(f"expected 3 values, got {len(values)}: {line!r}")
-    return values[0], values[1], values[2]
+    if len(values) != 5:
+        raise ValueError(f"expected 5 values, got {len(values)}: {line!r}")
+    return values[0], (values[1], values[2], values[3], values[4])
 
 
-def handle_sample(heading: float, pitch: float, roll: float) -> None:
-    """Print a readable compass-style AHRS reading."""
-    print(
-        f"heading={heading:6.1f}°  pitch={pitch:6.1f}°  roll={roll:6.1f}°",
-        flush=True,
-    )
+def handle_sample(heading: float, quat: tuple[float, float, float, float]) -> None:
+    """Called once per decoded sample. Edit this to log, plot, forward, etc."""
+    w, x, y, z = quat
+    
+    roll  = math.atan2(2*(w*x+y*z), 1-2*(x*x+y*y))
+    pitch = math.asin(max(-1.0, min(1.0, 2*(w*y-z*x))))
+    yaw   = math.atan2(2*(w*z+x*y), 1-2*(y*y+z*z))
+    yaw_from_quat_deg = math.degrees(yaw) % 360
+    yaw_deg = math.degrees(yaw) % 360
+    roll_deg = math.degrees(roll) % 360
+    pitch_deg = math.degrees(pitch) % 360
+    
+    if min(abs(heading - yaw_from_quat_deg), 360 - abs(heading - yaw_from_quat_deg)) > 5:
+        print(f"MISMATCH: reported heading={heading:.1f}, quaternion-derived={yaw_from_quat_deg:.1f}")
 
+    print(f"heading={heading:6.1f}, yaw = {yaw_deg:6.1f}, pitch={pitch_deg:6.1f}, roll={roll_deg:6.1f}  w={w:7.3f}  x={x:7.3f}  y={y:7.3f}  z={z:7.3f}",
+              flush=True)
 
+    
 class LineReceiver:
     """Reassembles newline-terminated lines from arbitrarily split notifications."""
 
@@ -135,12 +147,12 @@ async def run_session(device, args: argparse.Namespace) -> bool:
     def on_data(_sender, data: bytearray) -> None:
         for line in receiver.feed(data):
             try:
-                heading, pitch, roll = parse_line(line)
+                heading, quat = parse_line(line)
             except ValueError as error:
                 print(f"Skipping bad packet: {error}")
                 continue
             receiver.packets += 1
-            handle_sample(heading, pitch, roll)
+            handle_sample(heading, quat)
 
     label = device.name or device.address
     print(f"Connecting to {label} ({device.address})...")

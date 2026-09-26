@@ -17,5 +17,9 @@ bool updateAHRS();
 // Latest quaternion from the fusion filter.
 void getAHRSQuaternion(float *w, float *x, float *y, float *z);
 
-// get yaw, pitch and roll too
+// NEW: latest fused heading (yaw), 0-360 degrees.
 void getAHRSHeading(float *yaw, float *pitch, float *roll);
+
+void getSensordata(float *ax, float *ay, float *az,
+                   float *gx, float *gy, float *gz,
+                   float *mx, float *my, float *mz);

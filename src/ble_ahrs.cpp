@@ -97,13 +97,14 @@ void loop()
       
       
       // NEW: heading from filter.getYaw(), which is already 0-360°
-      float heading;
-      getAHRSHeading(&heading);
+      float heading, pitch, roll;
+
+      getAHRSHeading(&heading, &pitch, &roll);
       //------------------------
       // create the text buffer to send over heading and quaternion data via BLE UART
       char line[64];
-      int n = snprintf(line, sizeof(line), "%.1f,%.3f,%.3f,%.3f,%.3f\n",
-               heading, qw, qx, qy, qz);
+      int n = snprintf(line, sizeof(line), "%.1f,%.1f,%.1f\n",
+               heading, pitch, roll);
       if (Bluefruit.connected() && bleuart.notifyEnabled()) {
         bleuart.write((uint8_t*)line, n);
       }

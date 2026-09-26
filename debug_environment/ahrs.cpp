@@ -17,9 +17,12 @@ Adafruit_Sensor_Calibration_SDFat cal;
 #endif
 
 #define FILTER_UPDATE_RATE_HZ 100
-#define PRINT_EVERY_N_UPDATES 1
+#define PRINT_EVERY_N_UPDATES 4
 
 uint32_t timestamp;
+float latest_ax, latest_ay, latest_az;
+float latest_gx, latest_gy, latest_gz;
+float latest_mx, latest_my, latest_mz;
 
 void setupAHRS() {
   // CHANGED: wait for USB serial at most 2 s, so the board still boots on battery
@@ -63,7 +66,7 @@ Adafruit_Sensor *getAHRSGyroscope() { return gyroscope; }
 Adafruit_Sensor *getAHRSMagnetometer() { return magnetometer; }
 Adafruit_Sensor_Calibration *getAHRSCalibration() { return &cal; }
 
-//returns bool (true = filter ran this call) instead of void
+// CHANGED: returns bool (true = filter ran this call) instead of void
 bool updateAHRS() {
   static uint8_t counter = 0;
 
@@ -86,45 +89,50 @@ bool updateAHRS() {
   float gx = gyro.gyro.x * SENSORS_RADS_TO_DPS;
   float gy = gyro.gyro.y * SENSORS_RADS_TO_DPS;
   float gz = gyro.gyro.z * SENSORS_RADS_TO_DPS;
-   
+
   
   //gx -> roll
    //-gy -> pitch
   //-gz -> yaw
+ 
 
 float gyro_roll = gx;
 float gyro_pitch = -gy;
 float gyro_yaw = -gz;
 
 
-  filter.update( gyro_roll, gyro_pitch, gyro_yaw,
+  // filter.update( gyro_roll, gyro_pitch, gyro_yaw,
+  //               -accel.acceleration.x, 
+  //               accel.acceleration.y, 
+  //               accel.acceleration.z,
+  //               mag.magnetic.x, 
+  //               -mag.magnetic.y, 
+  //               mag.magnetic.z);
+  // return true;
+ filter.update( gyro_roll, gyro_pitch, gyro_yaw,
                 -accel.acceleration.x, 
                 accel.acceleration.y, 
                 accel.acceleration.z,
                 mag.magnetic.x, 
                 -mag.magnetic.y, 
                 mag.magnetic.z);
+  return true;
 
-
-  // Same print cadence as before (counter++ <= N returns early)
-  // CHANGED: only print when a USB host is attached
-  if (counter++ > PRINT_EVERY_N_UPDATES) {
-    counter = 0;
-  }
-
-  return true; //we actually updated AHRS
 }
 
-//lets the main sketch grab the latest quaternion
+// NEW: lets the main sketch grab the latest quaternion
 void getAHRSQuaternion(float *w, float *x, float *y, float *z) {
   filter.getQuaternion(w, x, y, z);
 }
 
-//#define MAGNETIC_DECLINATION_DEG  -14.5f //14.5 degrees E, subtract from mag N to get true N
-
-//lets the main sketch grab the latest heading
+//lets the main sketch grab the latest heading, TEMP FIX TIL I FIGURE OUT Qs
 void getAHRSHeading(float *yaw, float *pitch, float *roll) {
   *yaw = filter.getYaw();
   *pitch = filter.getPitch();
   *roll = filter.getRoll();
+
+  //correct but not correct
+  // *yaw = fmodf(360.0f - rawYaw, 360.0f);
+  // *pitch = -filter.getPitch();
+  // *roll = filter.getRoll();
 }
