@@ -97,12 +97,14 @@ float gyro_pitch = -gy;
 float gyro_yaw = -gz;
 
 
-  filter.update( gyro_roll, gyro_pitch, gyro_yaw,
+  filter.update(gyro_roll, 
+                gyro_pitch, 
+                gyro_yaw,
                 -accel.acceleration.x, 
                 accel.acceleration.y, 
                 accel.acceleration.z,
-                mag.magnetic.x, 
-                -mag.magnetic.y, 
+                -mag.magnetic.x, 
+                mag.magnetic.y, 
                 mag.magnetic.z);
 
 
