@@ -94,16 +94,16 @@ bool updateAHRS() {
 
 float gyro_roll = gx;
 float gyro_pitch = -gy;
-float gyro_yaw = -gz;
+float gyro_yaw = gz;
 
 
   filter.update(gyro_roll, 
                 gyro_pitch, 
                 gyro_yaw,
-                -accel.acceleration.x, 
+                accel.acceleration.x, 
                 accel.acceleration.y, 
                 accel.acceleration.z,
-                -mag.magnetic.x, 
+                mag.magnetic.x, 
                 mag.magnetic.y, 
                 mag.magnetic.z);
 
